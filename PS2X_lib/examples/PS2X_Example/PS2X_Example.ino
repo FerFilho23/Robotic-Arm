@@ -19,8 +19,8 @@
  ******************************************************************/
 //#define pressures   true
 #define pressures   false
-//#define rumble      true
-#define rumble      false
+#define rumble      true
+//#define rumble      false
 
 PS2X ps2x; // create PS2 Controller Class
 

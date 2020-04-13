@@ -3,6 +3,13 @@
 #include <EEPROM.h>
 PS2X ps2x;
 
+#define PS2_DAT        34 //Portas do pinos do receptor do controle     
+#define PS2_CMD        30  
+#define PS2_SEL        26  
+#define PS2_CLK        22  
+#define pressures   true
+#define rumble      true
+
 
 #define espacoMemoria 199
 #define tempoPausaEntreMovimentos 500  //configura o tempo de pausa entre cada movimento
@@ -63,12 +70,25 @@ int buttonState;         // variable for reading the pushbutton status
 
 
 void setup() {
-
-  error = ps2x.config_gamepad(22,30,26,34, true, true);  // Define os pinos onde está conectado o controle.
-  type = ps2x.readType();
   Serial.begin(57600);
+  delay(300);
+
+                            //Define os pinos onde está conectado o controle
+  error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);  // GamePad(clock, command, attention, data, Pressures?, Rumble?)
+  if(error == 0)
   Serial.println("BRACO ROBOTICO 1.5 - CONTROLE REMOTO PS2 + MODO AUTOMATICO");
   
+  else if(error == 1)
+    Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
+   
+  else if(error == 2)
+    Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
+
+  else if(error == 3)
+    Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
+
+  
+  type = ps2x.readType();
   
   Base.attach(pinBase); 
   Braco1.attach(pinBraco1);
@@ -92,77 +112,66 @@ void setup() {
 }
 
 void loop() {
-static byte modo = 0;
-static byte modoAnt;
-static byte movimento = 0;
-static byte posMemoria = 0;
-static unsigned long delayPausa;
+  static byte modo = 0;
+  static byte modoAnt;
+  static byte movimento = 0;
+  static byte posMemoria = 0;
+  static unsigned long delayPausa;
 
   buttonState = digitalRead(pinSwitch);
 
 
-if(error == 1) //Controle não encontrado
- { 
-   Serial.println("No Controller Found,check wiring");
-   return;
- }
+  if(error == 1) //Controle não encontrado
+     return;
 
   ps2x.read_gamepad(false, vibrate);
 
-   if (buttonState == HIGH) {
+  if (buttonState == HIGH) {
       Wireless = 0;
       digitalWrite (pinLedA, HIGH);
       digitalWrite (pinLedB, HIGH);
 
-   } else {
-      Wireless = 1;
-   }
+  } else Wireless = 1;
 
-  
-
-  if (ps2x.Analog(PSS_RX)>130){
-  vibrate = ps2x.Analog(PSS_RX);
-  } else { vibrate = 0; }
-
-if (Wireless == 0) { // MODO WIRELESS;
-  // GARRA
-  if (ps2x.Analog(PSS_RX)>=127) {
-  Garra.write(map(ps2x.Analog(PSS_RX), 0, 255, 20, 148));
-  GarraAtual = ps2x.Analog(PSS_RX);
-  if (GarraAtual == 255 && ps2x.Button(PSB_R1) == false ) {
-      Serial.println ("GARRA: Aberta");
-    }
-  if (GarraAtual <= 200 && GarraAntes == 255 && ps2x.Button(PSB_R1) == false) {
-      Serial.println ("GARRA: Fechada");
-    }
-  GarraAntes = GarraAtual;  
-  }
-
-//Pulso
-  if (ps2x.Button(PSB_L2)){  // DESCENDO 
-        posPulso += VELOC; 
-        if (posPulso>=179) {posPulso = 179;}
-        Pulso.write(posPulso); 
-        delay(Delay);    
-        Serial.println ("PULSO: Descendo ");   
-    }
-      if (ps2x.Button(PSB_R2)){  // SUBINDO
-        posPulso -= VELOC; 
-        if (posPulso < 0){ posPulso = 0;}
-        Pulso.write(posPulso); 
-        delay(Delay);  
-        Serial.println ("PULSO: Subindo ");   
-   
+  if (Wireless == 0) { // MODO WIRELESS;
+    // GARRA
+    if (ps2x.Analog(PSS_RX)>=127) {
+    Garra.write(map(ps2x.Analog(PSS_RX), 0, 255, 20, 148));
+    GarraAtual = ps2x.Analog(PSS_RX);
+    if (GarraAtual == 255 && ps2x.Button(PSB_R1) == false ) {
+        Serial.println ("GARRA: Aberta");
+      }
+    if (GarraAtual <= 200 && GarraAntes == 255 && ps2x.Button(PSB_R1) == false) {
+        Serial.println ("GARRA: Fechada");
+      }
+    GarraAntes = GarraAtual;  
     }
 
-//Base
+    //Pulso
+    if (ps2x.Button(PSB_L2)){  // DESCENDO 
+          posPulso += VELOC; 
+          if (posPulso>=179) {posPulso = 179;}
+          Pulso.write(posPulso); 
+          delay(Delay);    
+          Serial.println ("PULSO: Descendo ");   
+      }
+        if (ps2x.Button(PSB_R2)){  // SUBINDO
+          posPulso -= VELOC; 
+          if (posPulso < 0){ posPulso = 0;}
+          Pulso.write(posPulso); 
+          delay(Delay);  
+          Serial.println ("PULSO: Subindo ");   
+     
+      }
+
+    //Base
       if (ps2x.Button(PSB_PAD_LEFT)){  // ESQUERDA 
         posBase += VELOC; 
         if (posBase>=179) {posBase = 179;}
         Base.write(posBase); 
         delay(Delay);    
         Serial.println ("BASE: Anti-Horario ");   
-    }
+      }
       if (ps2x.Button(PSB_PAD_RIGHT)){  //  DIREITA 
         posBase -= VELOC; 
         if (posBase < 2){ posBase = 2;}
@@ -170,17 +179,17 @@ if (Wireless == 0) { // MODO WIRELESS;
         delay(Delay);  
         Serial.println ("BASE: Horario ");   
    
-    }
+      }
 
     
-//Anti-Braco
+    //Anti-Braco
       if (ps2x.Button(PSB_GREEN)){  // ESQUERDA 
         posAntiBraco += VELOC; 
         if (posAntiBraco>=179) {posAntiBraco = 179;}
         AntiBraco.write(posAntiBraco); 
         delay(Delay);    
         Serial.println ("ANTI-BRACO: Subindo ");   
-    }
+      }
       if (ps2x.Button(PSB_BLUE)){  //  DIREITA 
         posAntiBraco -= VELOC; 
         if (posAntiBraco < 0){ posAntiBraco = 0;}
@@ -188,9 +197,9 @@ if (Wireless == 0) { // MODO WIRELESS;
         delay(Delay);  
         Serial.println ("ANTI-BRACO: Descendo ");   
    
-    }
+      }
 
-//BRACO
+    //BRACO
     if (ps2x.Button(PSB_PAD_UP)){  // SUBINDO
         posBraco += VELOCBRACO; 
         if (posBraco > 180){ posBraco = 180;} 
@@ -199,8 +208,8 @@ if (Wireless == 0) { // MODO WIRELESS;
         delay(Delay);  
         Serial.println ("BRACO: Subindo ");   
 
-    }
-  if (ps2x.Button(PSB_PAD_DOWN)){   // DESCENDO
+      }
+    if (ps2x.Button(PSB_PAD_DOWN)){   // DESCENDO
         posBraco -= VELOCBRACO; 
         if (posBraco < 0){ posBraco = 0;}
         Braco1.write(posBraco); 
@@ -208,11 +217,11 @@ if (Wireless == 0) { // MODO WIRELESS;
         delay(Delay);     
         Serial.println ("BRACO: Descendo ");   
  
-    }
+     }
   
-// MONITOR SERIAL JOYSTICK
-  if (ps2x.Button(PSB_R1)) {
-     Serial.print("Valores Joystick:");
+   // MONITOR SERIAL JOYSTICK
+    if (ps2x.Button(PSB_R1)) {
+        Serial.print("Valores Joystick:");
         Serial.print(ps2x.Analog(PSS_LY), DEC); //Left stick, Y axis. Other options: LX, RY, RX  
         Serial.print(",");
         Serial.print(ps2x.Analog(PSS_LX), DEC); 
@@ -220,7 +229,7 @@ if (Wireless == 0) { // MODO WIRELESS;
         Serial.print(ps2x.Analog(PSS_RY), DEC); 
         Serial.print(",");
         Serial.println(ps2x.Analog(PSS_RX), DEC); 
-  }
+     }
   
      delay(50);
   }
@@ -329,8 +338,8 @@ if (Wireless == 0) { // MODO WIRELESS;
  
 }
 byte pinBotao1Modo() {
-#define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
-#define tempoBotao    1500
+  #define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+  #define tempoBotao    1500
 
    bool estadoBotao;
    static bool estadoBotaoAnt; 
@@ -377,7 +386,7 @@ byte pinBotao1Modo() {
 }
 
 bool pinBotao2Retencao() {
-#define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+  #define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
 
    bool estadoBotao;
    static bool estadoBotaoAnt; 
@@ -400,7 +409,7 @@ bool pinBotao2Retencao() {
 }
 
 bool pinBotao2Apertado() {
-#define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
+  #define tempoDebounce 40 //(tempo para eliminar o efeito Bounce EM MILISEGUNDOS)
 
    bool estadoBotao;
    static bool estadoBotaoAnt; 
@@ -424,7 +433,7 @@ bool pinBotao2Apertado() {
 }
 
 void pinLedAPisca(bool reset) {
-static unsigned long delayPisca = 0;
+  static unsigned long delayPisca = 0;
 
    if (reset) {
       delayPisca = millis();
@@ -443,14 +452,14 @@ static unsigned long delayPisca = 0;
 }
 
 void setMemoria(byte posicao, byte servo, byte valor) {
-int posMem;
+  int posMem;
 
     posMem = ((posicao * 5) + servo) + 1;
     EEPROM.write(posMem, valor);
 }
 
 byte readMemoria(byte posicao, byte servo) {
-int posMem;
+  int posMem;
 
     posMem = ((posicao * 5) + servo) + 1;
     return EEPROM.read(posMem);
